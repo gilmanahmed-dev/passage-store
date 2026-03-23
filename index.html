@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passage Bank</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bg: '#0a0a0b',
+                        surface: '#141416',
+                        card: '#1a1a1e',
+                        border: '#2a2a30',
+                        muted: '#6b6b76',
+                        accent: '#c9a962',
+                        accentDark: '#a68b4e',
+                        text: '#f5f5f7',
+                        textMuted: '#a0a0a8'
+                    },
+                    fontFamily: {
+                        display: ['Space Grotesk', 'sans-serif'],
+                        body: ['DM Sans', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: #0a0a0b;
+            color: #f5f5f7;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .bg-atmosphere {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(201, 169, 98, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse 60% 40% at 80% 100%, rgba(201, 169, 98, 0.05) 0%, transparent 40%),
+                linear-gradient(180deg, #0a0a0b 0%, #0d0d0f 100%);
+        }
+        .grain-overlay {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)'/%3E%3C/svg%3E");
+        }
+        .page-enter { animation: pageEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes pageEnter { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .stagger-1 { animation-delay: 0.05s; } .stagger-2 { animation-delay: 0.1s; } .stagger-3 { animation-delay: 0.15s; } .stagger-4 { animation-delay: 0.2s; } .stagger-5 { animation-delay: 0.25s; }
+        .card-glow { position: relative; }
+        .card-glow::before {
+            content: ''; position: absolute; inset: -1px; border-radius: 16px;
+            background: linear-gradient(135deg, rgba(201, 169, 98, 0.3) 0%, transparent 50%, rgba(201, 169, 98, 0.1) 100%);
+            opacity: 0; transition: opacity 0.4s ease; z-index: -1;
+        }
+        .card-glow:hover::before { opacity: 1; }
+        .img-shimmer { position: relative; overflow: hidden; }
+        .img-shimmer::after {
+            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+            transition: left 0.6s ease;
+        }
+        .card-glow:hover .img-shimmer::after { left: 100%; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #141416; }
+        ::-webkit-scrollbar-thumb { background: #2a2a30; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="bg-atmosphere"></div>
+    <div class="grain-overlay"></div>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        const booksData = [
+            {
+                id: 1,
+                name: "Pride and Prejudice",
+                author: "Jane Austen",
+                image: "pride and prejudice.jpeg", 
+                passage: `'My dear Mr. Bennet,' said his lady to him one day, 'have you heard that Netherfield Park is let at last?'
+Mr. Bennet replied that he had not.
+'But it is,' returned she, 'for Mrs. Long has just been here, and she told me all about it.'
+Mr. Bennet made no answer.
+'Do you not want to know who has taken it?' cried his wife impatiently.
+'You want to tell me, and I have no objection to hearing it.'
+This was invitation enough.
+'Why, my dear, you must know, Mrs. Long says that Netherfield is taken by a young man of large fortune from the north of England; that he came down on Monday in a chaise and four to see the place, and was so much delighted with it that he agreed with Mr. Morris immediately; that he is to take possession before Michaelmas, and some of his servants are to be in the house by the end of next week.'
+'What is his name?'
+'Bingley.'
+'Is he married or single?'
+'Oh, single, to be sure! A single man of large fortune; four or five thousand a year. What a fine thing for our girls!'
+'How so? How can it affect them?'
+'My dear Mr. Bennet,' replied his wife, 'how can you be so tiresome? You must know that I am thinking of his marrying one of them.'
+'Is that his design in settling here?'
+'Design? Nonsense, how can you talk so! But it is very likely that he may fall in love with one of them, and therefore you must visit him as soon as he comes.'
+'I see no occasion for that. You and the girls may go, or you may send them by themselves, which perhaps will be still better, for as you are as handsome as any of them, Mr. Bingley might like you the best of the party.'
+'My dear, you flatter me. I certainly have had my share of beauty, but I do not pretend to be anything extraordinary now. When a woman has five grown-up daughters, she ought to give over thinking of her own beauty.'
+'In such cases, a woman has not often much beauty to think of.'
+'But, my dear, you must indeed go and see Mr. Bingley when he comes into the neighbourhood.'
+'It is more than I engage for, I assure you.'
+'But consider your daughters. Only think what an establishment it would be for one of them. Sir William and Lady Lucas are determined to go, merely on that account; for in general, you know, they visit no newcomers. Indeed you must go, for it will be impossible for us to visit him if you do not.'
+'You are over-scrupulous, surely. I dare say Mr. Bingley will be very glad to see you; and I will send a few lines by you to assure him of my hearty consent to his marrying whichever he chooses of the girls, though I must throw in a good word for my little Lizzy.'
+'I desire you will do no such thing. Lizzy is not a bit better than the others; and I am sure she is not half so handsome as Jane, nor half so good-humoured as Lydia. But you are always giving her the preference.'
+'They have none of them much to recommend them,' replied he, 'they are all silly and ignorant like other girls; but Lizzy has something more of quickness than her sisters.'
+'Mr. Bennet, how can you abuse your own children in such a way? You take delight in vexing me. You have no compassion on my poor nerves.'
+'You mistake me, my dear. I have a high respect for your nerves. They are old friends. I have heard you mention them with consideration these twenty years at least.'
+'Ah, you do not know what I suffer.'
+'But I hope you will get over it, and live to see many young men of four thousand a year come into the neighbourhood.'
+'It will be no use to us if twenty such should come, since you will not visit them.'
+'Depend upon it, my dear, that when there are twenty, I will visit them all.'
+Mr. Bennet was so odd a mixture of quick parts, sarcastic humour, reserve, and caprice, that the experience of three-and-twenty years had been insufficient to make his wife understand his character. Her mind was less difficult to develop. She was a woman of mean understanding, little information, and uncertain temper. When she was discontented, she fancied herself nervous. The business of her life was to get her daughters married; its solace was visiting and news.`,
+                summary: `Summary 1 — Focus on the couple's personalities
+Mr. and Mrs. Bennet are a married couple with five daughters. Mrs. Bennet is excited to hear that a rich young man named Bingley has moved into Netherfield Park nearby. She desperately wants her husband to visit him so one of their daughters can marry him. Mr. Bennet teases her the whole time instead of giving a straight answer. At the end, the narrator tells us Mrs. Bennet is not very clever, and her only goal in life is to get her daughters married.
+
+Summary 2 — Focus on the conversation
+Mrs. Bennet tells her husband that a wealthy single man called Mr. Bingley has rented Netherfield Park. She pushes Mr. Bennet to visit him, hoping Bingley will marry one of their five daughters. Mr. Bennet keeps joking and avoiding a serious reply, which frustrates his wife greatly. He finally hints he will visit but never says it directly. The chapter ends by describing Mrs. Bennet as a woman of little intelligence whose whole life revolves around finding husbands for her daughters.
+
+Summary 3 — Focus on social pressure and marriage
+In 19th century England, a woman's biggest goal was to marry her daughters into wealthy families. When Mrs. Bennet hears a rich man has arrived nearby, she immediately sees an opportunity. She pressures her husband to visit Mr. Bingley and make a good impression. Mr. Bennet is sarcastic and unbothered, while his wife is anxious and impatient. Their very different personalities are clear from just this one short conversation.`,
+                title: `1. A Wealthy Neighbour and a Mother's Dream
+2. The Arrival of Mr. Bingley
+3. Five Daughters and One Fortune
+4. A Battle of Wits Between Husband and Wife
+5. Marriage, Money and Netherfield Park
+6. Mrs. Bennet's Greatest Mission
+7. The Man Who Changed Everything
+8. A Single Man of Large Fortune
+9. Love, Logic and a Mother's Obsession
+10. When Netherfield Got a New Tenant`,
+                driveLink: "https://drive.google.com/file/d/1DkXBSS0eTIw9qohp6fEhn_Rz8HeTkCgn/view?usp=sharing"
+            },
+            {
+                id: 2,
+                name: "In Search of London",
+                author: "H.V Morton",
+                image: "in search of london.png", 
+                passage: `Colonel Blood was a reckless Irishman who, like many another soldier of fortune, made London his headquarters when Charles II was restored to the throne. He was a desperate ruffian, ready to take on any venture.
+In the time of Charles II, the regalia was kept, without any of the precautions which safeguard it today, in an iron cage on the ground floor of the Martin Tower. The upper floors formed the living apartments of the keeper in charge of the jewels, an old man of nearly eighty named Talbot Edwards. His salary had been in abeyance for some time, which was not unusual in the reign of Charles II, and he was therefore allowed to take fees from visitors who wished to see the jewels. The only precaution observed was that as soon as anyone entered the jewel-house, Edwards locked the door.
+One day in April 1671, an inoffensive country parson in bands and gown visited the tower with his wife. They said they were strangers in London and would like to see the Crown Jewels. The 'parson' was, of course, Colonel Blood, and the 'wife' was a female accomplice. While old Edwards was describing the regalia to his visitors, the 'wife' was suddenly seized with 'internal qualms,' and the kind-hearted old keeper invited his visitors to step upstairs, where Mrs. Edwards helped the 'parson's' wife to recover.
+Thus Blood and his companion 'established confidence' in their victim, as the modern crook would express it. In a day or so, the 'parson' called to thank Mrs. Edwards and to give her a present of a pair of gloves. So the acquaintance grew into friendship, and the 'parson' with his 'wife' became frequent visitors in the Edwards' household. Edwards had an unmarried daughter and also a son, who was absent in Flanders. It was suggested that a marriage might be arranged between Miss Edwards and a nephew and ward of the 'parson,' an idea which found favour with the Edwards' family. A day was therefore appointed on which the 'parson' was to produce his nephew for inspection. Upon this day, just as it was growing dark, Blood, still disguised as a parson, arrived at the tower on horseback with four companions. One man was to hold the horses at St. Katherine's Gate, while Blood and the other three, one of whom was to impersonate the 'nephew,' were to steal the regalia. Blood was to steal the crown, an old ex-Ironside named Parrot was to pocket the orb, while a third rogue was to file the sceptre into three pieces and place them in a bag. The 'nephew' was to keep guard. The thieves were armed with sword-canes and a brace of pistols apiece.
+Old Edwards greeted them warmly at the Martin Tower and said that his wife and daughter would be down in a moment. Blood remarked that, as his friends were strangers to London, they would like to see the Crown Jewels. The old man at once unlocked the jewel-room door, and the thieves trooped in, except the 'nephew,' who guarded the stairs with the coy remark that he would rather catch a glimpse of his bride than of any jewels! No sooner were the thieves inside than they knocked down Edwards and gagged him. Blood snatched the crown and smashed in the arches with a wooden mallet in order to make it easier to pocket. Parrot secured the orb, with its enormous ruby, while the third man began to file the sceptre. At this point there occurred one of those incredible surprises which no novelist would dare to introduce into fiction. Young Edwards, who was believed to be in Flanders, suddenly arrived home and was startled to find a stranger on the stairs. He ran up past the watching man to see his mother and sister.
+Alarmed by this unexpected development, the 'nephew' lost his nerve and gave the alarm. The thieves opened the door and walked out calmly with the crown and the orb, leaving the half-filed sceptre behind. Edwards, freeing himself from the gag, began to shout that the Crown had been stolen.
+The alarm spread until the tower was in confusion. Blood added to it as he ran, the crown hidden in his parson's gown, by shouting, 'Stop the rogues!' and pointing to running figures. Captain Beckenham, commanding the main guard, happened, more by luck than anything else, to spot Blood as the real thief, and he chased him out of the tower to St. Katherine's Wharf. There a rabble joined in the chase and captured the thieves as they were actually mounting their horses. Beckenham closed with Blood, who let off a pistol in his face, but it missed fire. The next instant Blood was captured, after a struggle in which several stones fell from the crown into the mud; a pearl was picked up by a sweeper, a diamond by an apprentice, and several stones were never recovered.
+Parrot was also overpowered, the orb still in his breeches pocket. One of the rubies had worked loose and was found afterwards in his garments. As the thieves were being led off, Colonel Blood said over his shoulder to Captain Beckenham, 'Ah well, it was a gallant deed, although it failed. It was to gain a crown.'
+The strangest part of the story, in an age when any petty theft was punishable by death, is perhaps the sequel. In a few days' time, Blood was summoned to Whitehall, where Charles II received him in private audience. It would be interesting to know what was said during this interview, for Blood emerged from it the owner of an estate in Ireland which brought in £500 a year! Charles II has never been cleared of the suspicion that, in need of ready money as usual, he had hired Blood to steal his own crown! Another rumour at the time was that the king had boasted that no man could steal the crown and, in order to bring himself to the king's notice, Blood had attempted to do so.`,
+                summary: `Summary 1
+Colonel Blood was a dangerous and cunning Irishman living in London during the reign of King Charles II. He disguised himself as a parson and tricked an old jewel keeper named Talbot Edwards into trusting him. On a planned day, Blood and his men entered the Tower of London and tried to steal the Crown Jewels. They managed to grab the crown and the orb, but were caught while trying to escape. Strangely, instead of being punished, Blood was privately received by the king and rewarded with an estate in Ireland.
+
+Summary 2
+A reckless Irishman named Colonel Blood wanted to steal the Crown Jewels from the Tower of London. He spent weeks pretending to be a friendly parson, winning the trust of the jewel keeper Edwards and his family. On the day of the robbery, his gang knocked Edwards down, grabbed the crown and orb, and tried to run. They were chased and caught near St. Katherine's Wharf. The biggest mystery is that King Charles II, instead of punishing Blood, gave him land worth £500 a year.
+
+Summary 3
+Colonel Blood cleverly disguised himself as a clergyman to get close to Talbot Edwards, the keeper of the Crown Jewels at the Tower of London. He built a fake friendship with Edwards' family and used a made-up marriage plan to get inside the tower. Blood and his men attacked Edwards, stole the crown and orb, and tried to escape. However, the unexpected return of Edwards' son ruined the plan and they were caught. Charles II later met Blood in secret and rewarded him, leading many to suspect the king himself was behind the theft.`,
+                title: `
+1. The Daring Theft of the Crown Jewels
+2. Colonel Blood and the Tower of London
+3. The Rogue Who Almost Stole a Crown
+4. A Soldier of Fortune's Boldest Venture
+5. Trust, Trickery and the Crown Jewels
+6. The Man Who Tried to Steal the King's Crown
+7. Blood, Betrayal and the Tower
+8. The Most Audacious Robbery in English History
+9. A Gallant Deed That Failed
+10. Did the King Hire His Own Thief?
+
+`,
+                driveLink: "https://drive.google.com/file/d/1eFQJMX_xiiTauaEw9JuCZeQSoTfCVsJi/view?usp=sharing"
+            },
+            {
+                id: 3,
+                name: "Lost Horizon",
+                author: "James Hilton",
+                image: "lost horizon.jpeg",
+                passage: `Suddenly they were all awakened by a lurch of the machine. Conway's head struck the window, dazing him for the moment; a returning lurch sent him floundering between the two tiers of seats. It was much colder. The first thing he did, automatically, was to glance at his watch; it showed half-past one — he must have been asleep for some time. His ears were full of a loud flapping sound, which he took to be imaginary until he realized that the engine had shut off and that the plane was rushing against a gale. Then he stared through the window and could see the earth quite close — vague and snail-grey, scampering underneath. 'He's going to land!' Mallinson shouted; and Barnard, who had also been flung out of his seat, responded with a saturnine: 'If he's lucky.' Miss Brinklow, whom the entire commotion seemed to have disturbed least of all, was adjusting her hat as calmly as if Dover harbour were just in sight.
+
+Presently the plane touched ground. But it was a bad landing this time. Mallinson groaned as he clutched at his seat during ten seconds of crashing and swaying. Something was heard to strain and snap, and one of the tyres exploded. 'That's done it,' he added in tones of anguished pessimism. 'A broken tail-skid — we'll have to stay where we are now, that's certain.'
+
+Conway, never talkative at times of crisis, stretched his stiffened legs and felt his head where it had banged against the window. A bruise — nothing much. He must do something to help these people. But he was the last of the four to stand up when the plane came to rest. 'Steady,' he called out as Mallinson wrenched open the door of the cabin and prepared to make the jump to earth; and eerily, in the comparative silence, the youth's answer came: 'No need to be steady — this looks like the end of the world — there's not a soul about, anyhow.'
+
+A moment later, chilled and shivering, they were all aware that this was so. With no sound in their ears save the fierce gusts of wind and their own crunching footsteps, they felt themselves at the mercy of something dour and savagely melancholy — a mood in which both earth and air were saturated. The moon looked to have disappeared behind clouds, and starlight illumined a tremendous emptiness heaving with wind. Without thought or knowledge, one could have guessed that this bleak world was mountain-high, and that the mountains rising from it were mountains on top of mountains. A range of them gleamed on a far horizon like a row of dog-teeth.
+
+Mallinson, feverishly active, was already making for the cockpit. 'I'm not scared of the fellow on land, whoever he is,' he cried. 'I'm going to tackle him right away.'
+
+The others watched, hypnotized by the spectacle of such energy, though apprehensive also. Conway sprang after him, but too late to prevent the investigation. After a few seconds, however, the youth dropped down again, gripping his arm, and muttering in a hoarse, sobered staccato: 'I say, Conway, it's queer. I think the fellow's ill or dead or something. I can't get a word out of him. Come up and look. I took his revolver, at any rate.'
+
+'Better give it to me,' said Conway, and though still rather dazed by the recent blow on his head, he nerved himself for action. Of all times and places and situations on earth, this seemed to him to combine the most hideous discomforts. He hoisted himself stiffly into a position from which he could see, not very well, into the enclosed cockpit. There was a strong smell of petrol, so he did not risk striking a match. He could just discern the pilot, huddled forward, his head sprawling over the controls. He shook him, unfastened his helmet, and loosened his clothes round his neck. A moment later he turned round to report: 'Yes, there's something happened to him. We must get him out.' But an observer might have added that something had happened to Conway as well. His voice was sharper, more incisive; no longer did he sound to be hovering on the brink of some profound doubtfulness. The time, the place, the cold, his fatigue, were now of less account; there was a job that simply had to be done, and the more conventional part of him was uppermost and preparing to do it.
+
+With Barnard and Mallinson assisting, the pilot was extracted from his seat and lifted to the ground. He was unconscious, not dead. Conway had no particular medical knowledge, but, as to most men who have lived in outlandish places, the phenomena of illness were mostly familiar. 'Possibly a heart attack brought on by the high altitude,' he diagnosed, stooping over the unknown man. 'We can do very little for him out here — there's no shelter from this infernal wind. Better get him inside the cabin, and ourselves too. We haven't an idea where we are, and it's hopeless to make a move until daylight.'`,
+                summary: `
+Summary 1
+A group of passengers on a plane were suddenly woken up by a violent lurch as the plane crashed down in an unknown freezing location. The landing was very bad and one of the tyres exploded, leaving the plane badly damaged. The passengers stepped outside and found themselves surrounded by total darkness, fierce wind and enormous mountains. Mallinson rushed to check on the pilot and found him unconscious in the cockpit. Conway took charge, got the pilot out of the plane and suggested everyone stay inside the cabin until daylight.
+
+Summary 2
+Conway and his fellow passengers were jolted awake when their plane suddenly crashed in a cold and remote mountainous region. The landing broke the plane's tail-skid, making it impossible to fly again. Outside, the passengers found nothing but darkness, howling wind and massive mountains stretching in every direction. The bold and restless Mallinson rushed to the cockpit and discovered the pilot was unconscious. Conway calmly took over, helped pull the pilot out and told everyone to stay put until morning.
+
+Summary 3
+A plane carrying Conway and three other passengers made a terrifying crash landing in a freezing and desolate mountain region in the middle of the night. The passengers were shaken and confused, with Conway himself having banged his head against the window. When they stepped outside they were overwhelmed by darkness, bitter cold and the sight of enormous mountains all around them. Mallinson discovered the pilot collapsed over the controls, unable to speak or move. Conway diagnosed a possible heart attack caused by the high altitude and told everyone to shelter inside the cabin until daylight.`,
+                title: `1. A Terrifying Crash Landing in the Mountains
+2. Lost in the Himalayas
+3. The Night the Plane Went Down
+4. Stranded at the Top of the World
+5. Conway Takes Charge
+6. The Plane, the Pilot and the Unknown Mountains
+7. A Fight for Survival in the Freezing Dark
+8. The End of the World
+9. Crash Landing at High Altitude
+10. Helpless Among the Mountains`,
+                driveLink: "https://drive.google.com/file/d/16J_5JcWcjMq7w_a710FO6JvR_QPFBAQV/view?usp=sharing"
+            },
+            {
+                id: 4,
+                name: "The Lost World",
+                author: "Sir Arthur Conan Doyle",
+                image: "tlw.png",
+                passage: `Suddenly Lord John, who was walking first, halted with uplifted hand.
+
+'Look at this!' said he. 'By George, this must be the trail of the father of all birds!'
+
+An enormous three-toed track was imprinted in the soft mud before us. The creature, whatever it was, had crossed the swamp and had passed on into the forest. We all stopped to examine that monstrous spoor. If it were indeed a bird — and what animal could leave such a mark? — its foot was so much larger than an ostrich's that its height upon the same scale must be enormous. Lord John looked eagerly round him and slipped two cartridges into his elephant-gun.
+
+'I'll stake my good name as a shikaree (hunter),' said he, 'that the track is a fresh one. The creature has not passed ten minutes. Look how the water is still oozing into that deeper print! By Jove! See, here is the mark of a little one!'
+
+Sure enough, smaller tracks of the same general form were running parallel to the larger ones.
+
+'But what do you make of this?' cried Professor Summerlee triumphantly, pointing to what looked like the huge print of a five-fingered human hand appearing among the three-toed marks.
+
+'Wealden!' cried Challenger, in an ecstasy. 'I've seen them in the Wealden clay. It is a creature walking erect upon three-toed feet, and occasionally putting one of its five-fingered fore-paws upon the ground. Not a bird, my dear Roxton — not a bird.'
+
+'A beast?'
+
+'No; a reptile — a dinosaur. Nothing else could have left such a track. They puzzled a worthy Sussex doctor some ninety years ago; but who in the world could have hoped — hoped — to have seen a sight like that?'
+
+His words died away into a whisper, and we all stood motionless in amazement. Following the tracks, we had left the morass and passed through a screen of brushwood and trees. Beyond was an open glade, and in this were five of the most extraordinary creatures that I have ever seen. Crouching down among the bushes, we observed them at our leisure.
+
+There were, as I say, five of them, two being adults and three young ones. In size they were enormous. Even the babies were as big as elephants, while the two large ones were far beyond all creatures I have ever seen. They had slate-coloured skin, which was scaled like a lizard's and shimmered where the sun shone upon it. All five were sitting up, balancing themselves upon their broad, powerful tails and their huge three-toed hind feet, while with their small five-fingered front feet they pulled down the branches upon which they browsed. I do not know that I can bring their appearance home to you better than by saying that they looked like monstrous kangaroos, twenty feet in length, and with skin like black crocodiles.
+
+I do not know how long we stayed motionless gazing at this marvellous spectacle. A strong wind blew towards us and we were well concealed, so there was no chance of discovery. From time to time the little ones played round their parents in unwieldy gambols, the great beasts bounding into the air and falling with dull thuds upon the earth. The strength of the parents seemed to be limitless, for one of them, having some difficulty in reaching a bunch of foliage which grew upon a considerable-sized tree, put his forelegs round the trunk and tore it down as if it had been a sapling. The action seemed, as I thought, to show not only the great development of its muscles, but also the small one of its brain, for the whole weight came crashing down upon the top of it, and it uttered a series of shrill yelps to show that, big as it was, there was a limit to what it could endure. The incident made it think, apparently, that the neighbourhood was dangerous, for it slowly lurched off through the wood, followed by its mate and its three enormous infants. We saw the shimmering slaty gleam of their skins between the tree-trunks, and their heads undulating high above the brushwood. Then they vanished from our sight.
+
+I looked at my comrades. Lord John was standing at gaze with his finger on the trigger of his elephant-gun, his eager hunter's soul shining from his fierce eyes. What would he not give for one such head to place between the two crossed oars above the mantelpiece in his snuggery at the Albany! And yet his reason held him in, for all our exploration of the wonders of this unknown land depended upon our presence being concealed from its inhabitants. The two professors were in silent ecstasy. In their excitement they had unconsciously seized each other by the hand, and stood like two children in the presence of a marvel.`,
+                summary: `Summary 1
+A group of explorers in South America discovered enormous three-toed footprints in the mud of a swamp. Professor Challenger identified them as dinosaur tracks, which made everyone stop in shock and amazement. Following the tracks, they soon came across five living dinosaurs — two adults and three young ones — feeding quietly in an open clearing. The creatures were massive, with scaly skin like lizards and tails as powerful as elephants. The explorers watched in silent wonder, careful not to make a sound or be discovered.
+
+Summary 2
+Lord John spotted a giant three-toed footprint in the mud and the group realised they were following the trail of a prehistoric creature. Professor Challenger excitedly identified it as a dinosaur and the explorers soon found five of these enormous beasts in a forest clearing. The dinosaurs had slate-coloured scaly skin and were so huge that even the babies were the size of elephants. The group watched in total silence as the creatures played and fed, careful to stay hidden. Eventually the dinosaurs sensed danger and slowly disappeared into the woods.
+
+Summary 3
+While exploring a lost plateau in South America, a group of scientists and adventurers came across giant mysterious footprints in the swamp. Following the tracks, they discovered five living dinosaurs — creatures the world believed had been extinct for millions of years. The beasts were enormous and powerful, with skin like crocodiles and tails strong enough to knock down trees. The explorers crouched silently in the bushes, completely amazed by what they were seeing. Lord John desperately wanted to shoot one but held back, knowing their safety depended on staying hidden.`,
+                title: `1. The Discovery of Living Dinosaurs
+2. Footprints in the Swamp
+3. The Trail of the Father of All Birds
+4. Face to Face with Prehistoric Beasts
+5. The Lost World's Greatest Secret
+6. Giants of the Forgotten Age
+7. The Day the Explorers Found the Dinosaurs
+8. Hidden in the Brushwood
+9. A Marvel Beyond All Imagination
+10. The Creatures That Time Forgot`,
+                driveLink: "https://drive.google.com/file/d/1DE5T2AmNyNZwq0SYU_1m06kO3X4_VSjA/view?usp=sharing"
+            },
+            {
+                id: 5,
+                name: "Treasure Island",
+                author: "Robert Louis Stevenson",
+                image: "tereasure.jpg",
+                passage: `Then my mother got a candle in the bar, and, holding each other's hands, we advanced into the parlour. He lay as we had left him, on his back, with his eyes open, and one arm stretched out.
+
+'Now, Jim,' she said, 'that key.'
+
+I felt in his pockets, one after another. A few small coins, a thimble, and some thread and big needles, a piece of pigtail tobacco bitten away at the end, a knife with a crooked handle, a pocket-compass, and a tinder-box, were all that they contained, and I began to despair.
+
+'Perhaps it's round his neck,' suggested my mother.
+
+Overcoming a strong repugnance, I tore open his shirt at the neck, and there, sure enough, hanging to a bit of tarry string, which I cut with his own knife, we found the key. At this triumph we were filled with hope, and hurried upstairs, without delay, to the little room where he had slept so long, and where his box had stood since the day of his arrival.
+
+It was like any other seaman's chest on the outside, the initial 'B' burned on the top of it with a hot iron, and the corners somewhat smashed and broken as by long, rough usage.
+
+'Give me the key,' said my mother; and though the lock was very stiff, she had turned it and thrown back the lid in a twinkling.
+
+A strong smell of tobacco and tar rose from the interior, but nothing was to be seen on the top except a suit of very good clothes, carefully brushed and folded. They had never been worn, my mother said. Under that, the miscellany began — a tin, several sticks of tobacco, two brace of very handsome pistols, a piece of bar silver, an old Spanish watch and some trinkets of little value and mostly of foreign make, a pair of compasses mounted with brass, and five or six curious West Indian shells. It has often set me thinking since that he should have carried about these shells with him in his wandering, guilty, and hunted life.
+
+In the meantime we had found nothing of any value but the silver and the trinkets, and neither of these was in our way. Underneath there was an old boat-cloak, whitened with sea-salt on many a harbour-bar. My mother pulled it up with impatience, and there lay before us, the last things in the chest, a bundle tied up in oilcloth, and looking like papers, and a canvas bag, that gave forth, at a touch, the jingle of gold.
+
+'I'll show these rogues that I'm an honest woman,' said my mother. 'I'll have my dues, and not a farthing over. Hold the bag.' And she began to count over the amount of the captain's score from the sailor's bag into the one that I was holding. It was a long, difficult business, for the coins were of all countries and sizes, all shaken together at random. The guineas, too, were about the scarcest, and it was with these only that my mother knew how to make her count.
+
+When we were about half-way through, I suddenly put my hand upon her arm; for I had heard in the silent frosty air a sound that brought my heart into my mouth — the tap-tapping of the blind man's stick upon the frozen road. It drew nearer and nearer, while we sat holding our breath. Then it struck sharp on the inn door, and then we could hear the handle being turned and the bolt rattling as the wretched being tried to enter; and then there was a long time of silence both within and without. At last the tapping recommenced and, to our indescribable joy and gratitude, died slowly away until it ceased to be heard.
+
+'Mother,' said I, 'take the whole and let's be going,' for I was sure the bolted door must have seemed suspicious, and would bring the whole hornets' nest about our ears; though how thankful I was that I had bolted it, none could tell who had never met that terrible blind man.
+
+But my mother, frightened as she was, would not consent to take a fraction more than was due to her, and was obstinately unwilling to be content with less. It was not yet seven, she said, by a long way; she knew her rights and she would have them, and she was still arguing with me, when a little low whistle sounded a good way off upon the hill. That was enough, and more than enough, for both of us.`,
+                summary: `Summary 1
+Jim Hawkins and his mother entered the parlour where the dead sailor lay and searched his pockets for the key to his sea-chest. They found the key hanging around his neck and quickly opened the chest upstairs. Inside they found clothes, weapons, silver and a canvas bag full of gold coins. While counting out only the money owed to them, they heard the terrifying tap-tapping of the blind man's stick on the frozen road outside. They held their breath in fear until the sound slowly faded away into the distance.
+
+Summary 2
+After the old sailor died, Jim and his mother went to search his body for the key to his sea-chest. They found it tied around his neck and opened the chest to take only the money he owed them. The chest was full of strange and valuable items including pistols, silver, trinkets and a bag of gold coins. Just as they were counting the coins, the frightening sound of a blind man tapping his stick on the road outside froze them with terror. The tapping eventually stopped, but both Jim and his mother knew they had to leave immediately.
+
+Summary 3
+Jim Hawkins and his mother bravely searched the body of the dead sailor and found a key hanging around his neck. They rushed upstairs and opened his sea-chest, discovering a collection of unusual items along with a bag of gold coins. Mrs. Hawkins was determined to take only the exact amount owed to her, not a single coin more. While counting the money, they were suddenly terrified by the sound of a blind man's stick tapping on the road outside and the rattling of the inn door. The blind man eventually moved away, but the low whistle from the hill told them that their danger was far from over.
+
+`,
+                title: `1. The Dead Sailor's Secret Chest
+2. The Key Around His Neck
+3. A Bag of Gold and a Tap at the Door
+4. Jim and His Mother's Terrifying Night
+5. The Blind Man's Stick
+6. Courage, Gold and Fear at the Benbow Inn
+7. The Honest Woman and the Sailor's Gold
+8. The Night They Opened the Chest
+9. Terror in the Frozen Night
+10. Not a Farthing Over`,
+                driveLink: "https://drive.google.com/file/d/1lypAqpj7rriTUncHO-2JGHCwm0RVQqxY/view?usp=sharing"
+            }
+        ];
+        
+        function BookCard({ book, index, onClick }) {
+            const [isLoaded, setIsLoaded] = useState(false);
+            const [isHovered, setIsHovered] = useState(false);
+            
+            return (
+                <button
+                    onClick={() => onClick(book)}
+                    className={`card-glow group relative w-full rounded-2xl overflow-hidden bg-card border border-border transition-all duration-500 ease-out cursor-pointer text-left page-enter stagger-${index + 1}`}
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                    style={{ opacity: 0, animationFillMode: 'forwards' }}
+                    aria-label={`Open ${book.name}`}
+                >
+                    <div className="img-shimmer aspect-[3/4] overflow-hidden bg-card">
+                        <img
+                            src={book.image}
+                            alt={book.name}
+                            className={`w-full h-full object-cover transition-all duration-700 ease-out ${isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'} ${isHovered ? 'scale-110' : ''}`}
+                            onLoad={() => setIsLoaded(true)}
+                        />
+                        <div className={`absolute inset-0 bg-gradient-to-t from-bg via-bg/20 to-transparent transition-opacity duration-500 ${isHovered ? 'opacity-90' : 'opacity-70'}`}></div>
+                    </div>
+                    
+                    <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
+                        <div className={`transform transition-all duration-500 ${isHovered ? 'translate-y-0' : 'translate-y-1'}`}>
+                            <h3 className="font-display font-semibold text-lg sm:text-xl text-text group-hover:text-accent transition-colors duration-300">
+                                {book.name}
+                            </h3>
+                            <p className={`text-sm text-muted mt-1 transition-all duration-500 ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+                                {book.author}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div className={`absolute top-3 right-3 w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center transition-all duration-500 ${isHovered ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+                        <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                    </div>
+                </button>
+            );
+        }
+        
+        function HomePage({ onBookSelect }) {
+            return (
+                <div className="min-h-screen relative z-10 px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+                    <div className="max-w-6xl mx-auto">
+                        <header className="text-center mb-12 sm:mb-16 page-enter">
+                            <h1 className="font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-text tracking-tight mb-4">
+                                Passage Bank
+                            </h1>
+                            <p className="font-body text-muted text-base sm:text-lg md:text-xl max-w-2xl mx-auto leading-relaxed px-4">
+                                Here you can find The chapter, Summary, Title, Word meanings with example sentence
+                            </p>
+                            <div className="mt-8 flex items-center justify-center gap-3">
+                                <div className="w-12 h-px bg-gradient-to-r from-transparent to-accent/50"></div>
+                                <div className="w-2 h-2 rounded-full bg-accent"></div>
+                                <div className="w-12 h-px bg-gradient-to-l from-transparent to-accent/50"></div>
+                            </div>
+                        </header>
+                        
+                        <section aria-label="Book collection">
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+                                {booksData.map((book, index) => (
+                                    <BookCard key={book.id} book={book} index={index} onClick={onBookSelect} />
+                                ))}
+                            </div>
+                        </section>
+
+                        {/* CREDIT FOOTER - PREMIUM STYLE */}
+                        <footer className="mt-20 pt-8 border-t border-border/30 page-enter" style={{ animationDelay: '0.4s', opacity: 0, animationFillMode: 'forwards' }}>
+                            <div className="flex flex-col items-center justify-center gap-2">
+                                <p className="font-body text-xs sm:text-sm text-muted tracking-widest uppercase">
+                                    Crafted with precision by
+                                </p>
+                                <h3 className="font-display text-lg sm:text-xl text-text tracking-wider hover:text-accent transition-colors duration-300">
+                                    Gilman Ahmed
+                                </h3>
+                            </div>
+                        </footer>
+                    </div>
+                </div>
+            );
+        }
+        
+        function DetailPage({ book, onBack }) {
+            const contentRef = useRef(null);
+            useEffect(() => { contentRef.current?.scrollIntoView({ behavior: 'smooth' }); }, []);
+            
+            return (
+                <div ref={contentRef} className="min-h-screen relative z-10 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+                    <div className="max-w-4xl mx-auto">
+                        <button onClick={onBack} className="group flex items-center gap-2 text-muted hover:text-text transition-colors duration-300 mb-6 sm:mb-8 page-enter" aria-label="Go back to home">
+                            <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            <span className="font-body text-sm sm:text-base">Back to Library</span>
+                        </button>
+                        
+                        <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 mb-8 sm:mb-10 page-enter stagger-1" style={{ opacity: 0, animationFillMode: 'forwards' }}>
+                            <div className="flex-shrink-0 w-32 sm:w-40 mx-auto sm:mx-0">
+                                <div className="relative rounded-xl overflow-hidden shadow-2xl shadow-black/50">
+                                    <img src={book.image} alt={book.name} className="w-full aspect-[3/4] object-cover" />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-bg/50 to-transparent"></div>
+                                </div>
+                            </div>
+                            <div className="flex-1 text-center sm:text-left">
+                                <h1 className="font-display font-bold text-2xl sm:text-3xl md:text-4xl text-text mb-2">{book.name}</h1>
+                                <p className="font-body text-accent text-base sm:text-lg mb-4">by {book.author}</p>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-6 sm:space-y-8">
+                            <section className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border p-5 sm:p-6 page-enter stagger-2" style={{ opacity: 0, animationFillMode: 'forwards' }}>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    </div>
+                                    <h2 className="font-display font-semibold text-xl sm:text-2xl text-text">Passage</h2>
+                                </div>
+                                <p className="font-body text-textMuted leading-relaxed text-sm sm:text-base whitespace-pre-line">{book.passage}</p>
+                            </section>
+                            
+                            <section className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border p-5 sm:p-6 page-enter stagger-3" style={{ opacity: 0, animationFillMode: 'forwards' }}>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" /></svg>
+                                    </div>
+                                    <h2 className="font-display font-semibold text-xl sm:text-2xl text-text">Summary</h2>
+                                </div>
+                                <p className="font-body text-textMuted leading-relaxed text-sm sm:text-base whitespace-pre-line">{book.summary}</p>
+                            </section>
+                            
+                            <section className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border p-5 sm:p-6 page-enter stagger-4" style={{ opacity: 0, animationFillMode: 'forwards' }}>
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                                    </div>
+                                    <h2 className="font-display font-semibold text-xl sm:text-2xl text-text">Title</h2>
+                                </div>
+                                <p className="font-body text-textMuted leading-relaxed text-sm sm:text-base whitespace-pre-line">{book.title}</p>
+                            </section>
+                            
+                            <section className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border p-5 sm:p-6 page-enter stagger-5" style={{ opacity: 0, animationFillMode: 'forwards' }}>
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" /></svg>
+                                    </div>
+                                    <h2 className="font-display font-semibold text-xl sm:text-2xl text-text">Word Meanings</h2>
+                                </div>
+                                
+                                <div className="pt-2 pb-2">
+                                    <a
+                                        href={book.driveLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="group flex items-center justify-center gap-3 w-full py-5 px-8 bg-accent hover:bg-accentDark text-bg font-display font-semibold text-lg sm:text-xl rounded-xl transition-colors duration-300 shadow-lg shadow-accent/20"
+                                    >
+                                        <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                        Download PDF
+                                    </a>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        function App() {
+            const [currentPage, setCurrentPage] = useState('home');
+            const [selectedBook, setSelectedBook] = useState(null);
+            
+            const handleBookSelect = (book) => { setSelectedBook(book); setCurrentPage('detail'); };
+            const handleBack = () => { setCurrentPage('home'); setSelectedBook(null); };
+            
+            return (
+                <div className="font-body">
+                    {currentPage === 'home' && <HomePage onBookSelect={handleBookSelect} />}
+                    {currentPage === 'detail' && selectedBook && <DetailPage book={selectedBook} onBack={handleBack} />}
+                </div>
+            );
+        }
+        
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
